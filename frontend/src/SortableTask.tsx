@@ -1,34 +1,51 @@
 import React, { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Task } from "./App";
 
-interface Task { id: number; title: string; description?: string; position: number; column_id: number; }
-interface Props { task: Task; onDragEnd: (a:number,o:number|null)=>void; onUpdate: (title:string, desc?:string)=>void; onDelete: ()=>void; }
+interface Props {
+  task: Task;
+  onDragEnd: (activeId: number, overId: number | null) => void;
+  onUpdate: (updated: Partial<Task>) => void;
+  onDelete: () => void;
+}
 
 export default function SortableTask({ task, onUpdate, onDelete }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(task.title);
-  const [desc, setDesc] = useState(task.description || "");
+  const [formData, setFormData] = useState(task);
 
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging?0.5:1, padding:8, marginBottom:8, backgroundColor:"white", borderRadius:4, boxShadow:"0 1px 3px rgba(0,0,0,0.2)", cursor:"grab" };
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging?0.5:1 };
 
-  const handleSave = () => { onUpdate(title, desc); setEditing(false); };
+  const handleSave = () => {
+    onUpdate(formData);
+    setEditing(false);
+  };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div className="task-card" ref={setNodeRef} style={style} {...attributes} {...listeners}>
       {editing ? (
         <div>
-          <input value={title} onChange={e=>setTitle(e.target.value)} style={{width:"100%", marginBottom:4}} />
-          <textarea value={desc} onChange={e=>setDesc(e.target.value)} style={{width:"100%", marginBottom:4}} />
-          <button onClick={handleSave} style={{marginRight:4}}>Save</button>
+          <input value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} />
+          <input value={formData.summary} onChange={e=>setFormData({...formData, summary:e.target.value})} />
+          <textarea value={formData.description} onChange={e=>setFormData({...formData, description:e.target.value})} />
+          <input type="date" value={formData.start_date?.slice(0,10)} onChange={e=>setFormData({...formData, start_date:e.target.value})} />
+          <input type="date" value={formData.end_date?.slice(0,10)} onChange={e=>setFormData({...formData, end_date:e.target.value})} />
+          <input placeholder="Owner" value={formData.owner} onChange={e=>setFormData({...formData, owner:e.target.value})} />
+          <input placeholder="Assignee" value={formData.assignee} onChange={e=>setFormData({...formData, assignee:e.target.value})} />
+          <input type="number" placeholder="Reward" value={formData.reward} onChange={e=>setFormData({...formData, reward:Number(e.target.value)})} />
+          <button onClick={handleSave}>Save</button>
           <button onClick={()=>setEditing(false)}>Cancel</button>
         </div>
       ) : (
         <div>
           <strong>{task.title}</strong>
-          {task.description && <p style={{fontSize:12}}>{task.description}</p>}
-          <div style={{display:"flex", justifyContent:"flex-end", gap:4}}>
+          <p>{task.summary}</p>
+          <p>{task.description}</p>
+          <p>Start: {task.start_date?.slice(0,10)} End: {task.end_date?.slice(0,10)}</p>
+          <p>Owner: {task.owner} Assignee: {task.assignee}</p>
+          <p>Reward: {task.reward}</p>
+          <div className="task-actions">
             <button onClick={()=>setEditing(true)}>✏️</button>
             <button onClick={onDelete}>🗑</button>
           </div>
@@ -37,3 +54,4 @@ export default function SortableTask({ task, onUpdate, onDelete }: Props) {
     </div>
   );
 }
+

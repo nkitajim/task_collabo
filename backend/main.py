@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 import uuid, jwt, time, asyncio
+from datetime import datetime
 
 # -------------------------
 # Config (change for prod)
@@ -53,17 +54,36 @@ class Column(SQLModel, table=True):
 
 class Task(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    column_id: int = Field(foreign_key="column.id")
     title: str
-    description: Optional[str] = None
-    position: int = Field(default=0)
-    assignee_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    summary: Optional[str] = ""
+    description: Optional[str] = ""
+    start_date: datetime = Field(default_factory=datetime.utcnow)
+    end_date: Optional[datetime] = None
+    owner: Optional[str] = ""
+    assignee: Optional[str] = ""
+    reward: float = 0.0
+    position: int = 0
+    column_id: int
 
 class TaskCreate(BaseModel):
-    content: str
+    title: str
+    summary: Optional[str] = ""
+    description: Optional[str] = ""
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    owner: Optional[str] = ""
+    assignee: Optional[str] = ""
+    reward: Optional[float] = 0.0
 
 class TaskUpdate(BaseModel):
-    content: str
+    title: Optional[str]
+    summary: Optional[str]
+    description: Optional[str]
+    start_date: Optional[datetime]
+    end_date: Optional[datetime]
+    owner: Optional[str]
+    assignee: Optional[str]
+    reward: Optional[float]
 
 # -------------------------
 # DB init
@@ -232,12 +252,25 @@ async def delete_column(board_id: int, column_id: int):
 
 @app.post("/columns/{column_id}/tasks")
 async def create_task(column_id: int, task: TaskCreate):
-    t = Task(title=task.title, column_id=column_id)
+    t = Task(
+        column_id=column_id,
+        title=task.title,
+        summary=task.summary,
+        description=task.description,
+        start_date=task.start_date or datetime.utcnow(),
+        end_date=task.end_date,
+        owner=task.owner,
+        assignee=task.assignee,
+        reward=task.reward
+    )
     db.add(t)
     db.commit()
     db.refresh(t)
-    asyncio.create_task(manager.broadcast(t.column.board_id, {"type": "task_created", "task": {"id": t.id, "title": t.title, "description": t.description, "position": t.position, "column_id": t.column_id}}))
-    return {"id": t.id, "title": t.title, "description": t.description, "position": t.position, "column_id": t.column_id}
+    asyncio.create_task(manager.broadcast(t.column.board_id, {
+        "type": "task_created",
+        "task": serialize_task(t)  # dictに変換
+    }))
+    return serialize_task(t)
 
 @app.put("/tasks/{task_id}")
 async def update_task(task_id: int, task: TaskUpdate):
